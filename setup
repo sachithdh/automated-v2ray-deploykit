@@ -4,41 +4,43 @@
 # V2ray Server Setup Script with Nginx & SSL Configuration
 # =======================================================
 clear
-echo "==========================================="
-echo "     V2ray Server Setup with Nginx & SSL"
-echo "==========================================="
-echo "                        github.com/sachithdh"
-echo ""
-echo "Welcome to the Automated v2ray deploykit!"
-echo "Please follow the instructions to set up your server."
-echo "-------------------------------------------"
+echo -e "\033[1;32m==========================================="
+echo -e "     V2ray Server Setup with Nginx & SSL"
+echo -e "==========================================="
+echo -e "                        github.com/sachithdh"
+echo -e "\033[0m"
+echo -e "\033[1;34mWelcome to the Automated v2ray deploykit!"
+echo -e "Please follow the instructions to set up your server."
+echo -e "-------------------------------------------\033[0m"
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
 # =======================
 # Update & Install Packages
 # =======================
-echo "==========================================="
-echo "  Step 1: Updating and upgrading server"
-echo "==========================================="
-echo "Updating package lists and upgrading existing packages..."
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 1: Updating and upgrading server"
+echo -e "==========================================="
+echo -e "\033[0mUpdating package lists and upgrading existing packages..."
 sudo apt update
 sudo apt upgrade -y
 
-echo "Installing dependencies..."
+echo -e "\033[0mInstalling dependencies..."
 sudo apt install curl unzip uuid-runtime -y
 
 # =======================
 # Install V2ray
 # =======================
-echo "==========================================="
-echo "  Step 2: Installing V2ray"
-echo "==========================================="
-echo "Installing V2ray..."
-bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 2: Installing V2ray"
+echo -e "==========================================="
+echo -e "\033[0mInstalling V2ray..."
+
+sudo bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
 
 # Enable and start V2ray service
-echo "Enabling and starting V2ray..."
+echo -e "\033[0mEnabling and starting V2ray..."
+
 sudo systemctl enable v2ray
 sudo systemctl start v2ray
 
@@ -55,10 +57,11 @@ if [ -z "$UUID" ]; then
 fi
 
 # Creating the V2ray config
-echo "==========================================="
-echo "  Step 3: Configuring V2ray"
-echo "==========================================="
-echo "Configuring V2ray with UUID: $UUID..."
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 3: Configuring V2ray"
+echo -e "==========================================="
+echo -e "\033[0mConfiguring V2ray with UUID: $UUID..."
+
 V2RAY_CONFIG=$(cat <<EOF
 {
   "log": {
@@ -98,30 +101,30 @@ EOF
 )
 
 # Write the configuration to the V2ray config file
-echo "Writing V2ray config to $V2RAY_CONFIG_PATH..."
+echo -e "\033[0mWriting V2ray config to $V2RAY_CONFIG_PATH..."
 echo "$V2RAY_CONFIG" | sudo tee "$V2RAY_CONFIG_PATH" > /dev/null
 
 # Restart V2ray service
-echo "Restarting V2ray to apply configuration..."
+echo -e "\033[0mRestarting V2ray to apply configuration..."
 sudo systemctl restart v2ray
 
 # =======================
 # Install & Configure Nginx
 # =======================
-echo "==========================================="
-echo "  Step 4: Installing Nginx"
-echo "==========================================="
-echo "Installing Nginx..."
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 4: Installing Nginx"
+echo -e "==========================================="
+echo -e "\033[0mInstalling Nginx..."
 sudo apt install nginx -y
 
 # Let the user enter their server name
-echo -n "Enter your server name (e.g., example.com): "
+echo -n -e "\033[1;34mEnter your server name (e.g., example.com): \033[0m"
 read SERVER_NAME
 
 # Create Nginx configuration
-echo "==========================================="
-echo "  Step 5: Configuring Nginx"
-echo "==========================================="
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 5: Configuring Nginx"
+echo -e "==========================================="
 NGINX_CONFIG_PATH="/etc/nginx/conf.d/v2ray.conf"
 
 NGINX_CONFIG=$(cat <<EOF
@@ -153,58 +156,58 @@ EOF
 )
 
 # Write Nginx configuration to file
-echo "Writing Nginx config to $NGINX_CONFIG_PATH..."
+echo -e "\033[0mWriting Nginx config to $NGINX_CONFIG_PATH..."
 echo "$NGINX_CONFIG" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
 
 # Verify Nginx configuration
-echo "Verifying Nginx configuration..."
+echo -e "\033[0mVerifying Nginx configuration..."
 sudo nginx -t || { echo "Nginx config test failed"; exit 1; }
 
 # Reload Nginx to apply the changes
-echo "Reloading Nginx..."
+echo -e "\033[0mReloading Nginx..."
 sudo systemctl reload nginx || { echo "Failed to reload nginx"; exit 1; }
 
 # =======================
 # Install SSL via Certbot
 # =======================
-echo "==========================================="
-echo "  Step 6: Installing SSL with Certbot"
-echo "==========================================="
-echo "Installing Snap core..."
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 6: Installing SSL with Certbot"
+echo -e "==========================================="
+echo -e "\033[0mInstalling Snap core..."
 sudo snap install core || { echo "Snap install failed"; exit 1; }
 sudo snap refresh core
 
-echo "Installing Certbot..."
+echo -e "\033[0mInstalling Certbot..."
 sudo snap install --classic certbot
 
 # Create a symbolic link for Certbot
-echo "Creating symbolic link for Certbot..."
+echo -e "\033[0mCreating symbolic link for Certbot..."
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
 
 # Obtain SSL certificate for the domain
-echo "Obtaining SSL certificate for domain $SERVER_NAME..."
+echo -e "\033[0mObtaining SSL certificate for domain $SERVER_NAME..."
 sudo certbot --nginx -d $SERVER_NAME
 
 # Verify auto-renewal of the SSL certificate
-echo "Verifying Certbot auto-renewal..."
+echo -e "\033[0mVerifying Certbot auto-renewal..."
 sudo certbot renew --dry-run
 
 # Reload Nginx again after obtaining SSL cert
-echo "Reloading Nginx to apply SSL certificate..."
+echo -e "\033[0mReloading Nginx to apply SSL certificate..."
 sudo systemctl reload nginx
 
 # Restart V2ray service
-echo "Restarting V2ray to apply SSL changes..."
+echo -e "\033[0mRestarting V2ray to apply SSL changes..."
 sudo systemctl restart v2ray
 
 # =======================
 # Output Client Configuration
 # =======================
-echo "==========================================="
-echo "  Step 7: Outputting Client Configuration"
-echo "==========================================="
-echo "You have successfully configured your V2ray server!"
-echo "Here is your V2ray client config that can be used to connect to the server:"
+echo -e "\033[1;33m==========================================="
+echo -e "  Step 7: Outputting Client Configuration"
+echo -e "==========================================="
+echo -e "\033[0mYou have successfully configured your V2ray server!"
+echo -e "Here is your V2ray client config that can be used to connect to the server:"
 
 V2RAY_CLIENT_CONFIG=$(cat <<EOF
 {
@@ -258,8 +261,8 @@ EOF
 )
 
 # Display the client configuration
-echo "$V2RAY_CLIENT_CONFIG"
+echo -e "\033[1;36m$V2RAY_CLIENT_CONFIG\033[0m"
 
-echo "==========================================="
-echo " V2ray server setup completed successfully!"
-echo "==========================================="
+echo -e "\033[1;32m==========================================="
+echo -e " V2ray server setup completed successfully!"
+echo -e "==========================================="
