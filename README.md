@@ -22,10 +22,10 @@ This script automates the installation and configuration of a V2ray server with 
 
 Clone this repository to your server:
 
-````bash
+```bash
 git clone https://github.com/sachithdh/v2ray-automated-deploykit.git
 cd v2ray-automated-deploykit
-
+```
 
 ### 2. Run the Setup Script
 
@@ -33,8 +33,10 @@ Ensure the script is executable:
 
 ```bash
 chmod +x setup
+```
 
 Then, execute the script to start the installation process:
 
+```
 ./setup
-````
+```
