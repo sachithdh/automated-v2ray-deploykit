@@ -36,7 +36,10 @@ echo -e "  Step 2: Installing V2ray"
 echo -e "==========================================="
 echo -e "\033[0mInstalling V2ray..."
 
-sudo bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
+mkdir v2fly
+cd v2fly
+sudo curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh -o install.sh
+sudo bash install.sh
 
 # Enable and start V2ray service
 echo -e "\033[0mEnabling and starting V2ray..."
