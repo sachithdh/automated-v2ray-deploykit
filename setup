@@ -1,32 +1,64 @@
 #!/bin/bash
 
+# =======================================================
+# V2ray Server Setup Script with Nginx & SSL Configuration
+# =======================================================
+clear
+echo "==========================================="
+echo "     V2ray Server Setup with Nginx & SSL"
+echo "==========================================="
+echo "                        github.com/sachithdh"
+echo ""
+echo "Welcome to the Automated v2ray deploykit!"
+echo "Please follow the instructions to set up your server."
+echo "-------------------------------------------"
+
 set -e  # Exit immediately if a command exits with a non-zero status
 
-# update the server
+# =======================
+# Update & Install Packages
+# =======================
+echo "==========================================="
+echo "  Step 1: Updating and upgrading server"
+echo "==========================================="
+echo "Updating package lists and upgrading existing packages..."
 sudo apt update
-
-# Upgrade the server
 sudo apt upgrade -y
 
-# Install dependancies
+echo "Installing dependencies..."
 sudo apt install curl unzip uuid-runtime -y
 
-# Install v2ray
+# =======================
+# Install V2ray
+# =======================
+echo "==========================================="
+echo "  Step 2: Installing V2ray"
+echo "==========================================="
+echo "Installing V2ray..."
 bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
 
-# Enable v2ray
+# Enable and start V2ray service
+echo "Enabling and starting V2ray..."
 sudo systemctl enable v2ray
-
-# Start v2ray
 sudo systemctl start v2ray
 
-# Config V2ray
-
+# =======================
+# Configure V2ray
+# =======================
 V2RAY_CONFIG_PATH="/usr/local/etc/v2ray/config.json"
 
-# Generate unique uuid
+# Generate unique UUID for V2ray client
 UUID=$(uuidgen)
+if [ -z "$UUID" ]; then
+  echo "UUID generation failed"
+  exit 1
+fi
 
+# Creating the V2ray config
+echo "==========================================="
+echo "  Step 3: Configuring V2ray"
+echo "==========================================="
+echo "Configuring V2ray with UUID: $UUID..."
 V2RAY_CONFIG=$(cat <<EOF
 {
   "log": {
@@ -50,7 +82,7 @@ V2RAY_CONFIG=$(cat <<EOF
       "streamSettings": {
         "network": "ws",
         "wsSettings": {
-        "path": "/ray"
+          "path": "/ray"
         }
       }
     }
@@ -65,26 +97,33 @@ V2RAY_CONFIG=$(cat <<EOF
 EOF
 )
 
-# Write CONFIG into CONFIG_PATH
+# Write the configuration to the V2ray config file
+echo "Writing V2ray config to $V2RAY_CONFIG_PATH..."
 echo "$V2RAY_CONFIG" | sudo tee "$V2RAY_CONFIG_PATH" > /dev/null
 
-
-# Restart V2ray
+# Restart V2ray service
+echo "Restarting V2ray to apply configuration..."
 sudo systemctl restart v2ray
 
+# =======================
+# Install & Configure Nginx
+# =======================
+echo "==========================================="
+echo "  Step 4: Installing Nginx"
+echo "==========================================="
+echo "Installing Nginx..."
+sudo apt install nginx -y
 
-# Install nginx
-sudo apt install nginx
-
-# Configure nginx
-
-NGINX_CONFIG_PATH="/etc/nginx/conf.d/v2ray.conf"
-
-# Let user to enter server name
-echo -n "Enter your server name: "
+# Let the user enter their server name
+echo -n "Enter your server name (e.g., example.com): "
 read SERVER_NAME
 
-# Nginx config file
+# Create Nginx configuration
+echo "==========================================="
+echo "  Step 5: Configuring Nginx"
+echo "==========================================="
+NGINX_CONFIG_PATH="/etc/nginx/conf.d/v2ray.conf"
+
 NGINX_CONFIG=$(cat <<EOF
 server {
     server_name    $SERVER_NAME;
@@ -113,43 +152,59 @@ server {
 EOF
 )
 
-# Write CONFIG into CONFIG_PATH
+# Write Nginx configuration to file
+echo "Writing Nginx config to $NGINX_CONFIG_PATH..."
 echo "$NGINX_CONFIG" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
 
+# Verify Nginx configuration
+echo "Verifying Nginx configuration..."
+sudo nginx -t || { echo "Nginx config test failed"; exit 1; }
 
-# Verify the conf file
-sudo nginx -t
+# Reload Nginx to apply the changes
+echo "Reloading Nginx..."
+sudo systemctl reload nginx || { echo "Failed to reload nginx"; exit 1; }
 
-# Reload nginx with new config
-sudo sytemctl reload nginx
+# =======================
+# Install SSL via Certbot
+# =======================
+echo "==========================================="
+echo "  Step 6: Installing SSL with Certbot"
+echo "==========================================="
+echo "Installing Snap core..."
+sudo snap install core || { echo "Snap install failed"; exit 1; }
+sudo snap refresh core
 
-
-# Install snap core and check for updates
-sudo snap install core; sudo snap refresh core
-
-# Install certbot for SSL certification
+echo "Installing Certbot..."
 sudo snap install --classic certbot
 
-# Create symbolic link
-# This allows certbot to run anywhere by make certbot executable available in /usr/bin
+# Create a symbolic link for Certbot
+echo "Creating symbolic link for Certbot..."
 sudo ln -s /snap/bin/certbot /usr/bin/certbot
 
-# Certify domain using certbot
+# Obtain SSL certificate for the domain
+echo "Obtaining SSL certificate for domain $SERVER_NAME..."
 sudo certbot --nginx -d $SERVER_NAME
 
-# Verify certbot auto renewal
-sudo cerbot renew --dry-run
+# Verify auto-renewal of the SSL certificate
+echo "Verifying Certbot auto-renewal..."
+sudo certbot renew --dry-run
 
-# Reload nginx
+# Reload Nginx again after obtaining SSL cert
+echo "Reloading Nginx to apply SSL certificate..."
 sudo systemctl reload nginx
 
-# Restart v2ray
+# Restart V2ray service
+echo "Restarting V2ray to apply SSL changes..."
 sudo systemctl restart v2ray
 
-
-
-echo "You are successfullly configure your V2ray server!"
-echo "Here is your V2ray config file which can be use to connect to the v2ray server"
+# =======================
+# Output Client Configuration
+# =======================
+echo "==========================================="
+echo "  Step 7: Outputting Client Configuration"
+echo "==========================================="
+echo "You have successfully configured your V2ray server!"
+echo "Here is your V2ray client config that can be used to connect to the server:"
 
 V2RAY_CLIENT_CONFIG=$(cat <<EOF
 {
@@ -199,8 +254,12 @@ V2RAY_CLIENT_CONFIG=$(cat <<EOF
     }
   ]
 }
-
 EOF
 )
 
-echo $V2RAY_CLIENT_CONFIG
+# Display the client configuration
+echo "$V2RAY_CLIENT_CONFIG"
+
+echo "==========================================="
+echo " V2ray server setup completed successfully!"
+echo "==========================================="
