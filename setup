@@ -1,0 +1,206 @@
+#!/bin/bash
+
+set -e  # Exit immediately if a command exits with a non-zero status
+
+# update the server
+sudo apt update
+
+# Upgrade the server
+sudo apt upgrade -y
+
+# Install dependancies
+sudo apt install curl unzip uuid-runtime -y
+
+# Install v2ray
+bash <(curl -L https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh)
+
+# Enable v2ray
+sudo systemctl enable v2ray
+
+# Start v2ray
+sudo systemctl start v2ray
+
+# Config V2ray
+
+V2RAY_CONFIG_PATH="/usr/local/etc/v2ray/config.json"
+
+# Generate unique uuid
+UUID=$(uuidgen)
+
+V2RAY_CONFIG=$(cat <<EOF
+{
+  "log": {
+    "loglevel": "debug",
+    "access": "/var/log/v2ray/access.log",
+    "error": "/var/log/v2ray/error.log"
+  },
+  "inbounds": [
+    {
+      "port": 10000,
+      "listen":"127.0.0.1",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "$UUID",
+            "alterId": 64
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+        "path": "/ray"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom",
+      "settings": {}
+    }
+  ]
+}
+EOF
+)
+
+# Write CONFIG into CONFIG_PATH
+echo "$V2RAY_CONFIG" | sudo tee "$V2RAY_CONFIG_PATH" > /dev/null
+
+
+# Restart V2ray
+sudo systemctl restart v2ray
+
+
+# Install nginx
+sudo apt install nginx
+
+# Configure nginx
+
+NGINX_CONFIG_PATH="/etc/nginx/conf.d/v2ray.conf"
+
+# Let user to enter server name
+echo -n "Enter your server name: "
+read SERVER_NAME
+
+# Nginx config file
+NGINX_CONFIG=$(cat <<EOF
+server {
+    server_name    $SERVER_NAME;
+
+    index index.html;
+    root /usr/share/nginx/html/;
+
+    access_log /var/log/nginx/v2ray.access; # General access log
+    error_log /var/log/nginx/v2ray.error;  # General error log
+
+    location /ray { # Logging only for /ray requests
+        if (\$http_upgrade != "websocket") { 
+            return 404; # Return 404 when WebSocket upgrading fails
+        }
+        proxy_redirect off;
+        proxy_pass http://127.0.0.1:10000; # WebSocket is listening on localhost at port 10000
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        # Show real IP in v2ray logs
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+}
+EOF
+)
+
+# Write CONFIG into CONFIG_PATH
+echo "$NGINX_CONFIG" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
+
+
+# Verify the conf file
+sudo nginx -t
+
+# Reload nginx with new config
+sudo sytemctl reload nginx
+
+
+# Install snap core and check for updates
+sudo snap install core; sudo snap refresh core
+
+# Install certbot for SSL certification
+sudo snap install --classic certbot
+
+# Create symbolic link
+# This allows certbot to run anywhere by make certbot executable available in /usr/bin
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+
+# Certify domain using certbot
+sudo certbot --nginx -d $SERVER_NAME
+
+# Verify certbot auto renewal
+sudo cerbot renew --dry-run
+
+# Reload nginx
+sudo systemctl reload nginx
+
+# Restart v2ray
+sudo systemctl restart v2ray
+
+
+
+echo "You are successfullly configure your V2ray server!"
+echo "Here is your V2ray config file which can be use to connect to the v2ray server"
+
+V2RAY_CLIENT_CONFIG=$(cat <<EOF
+{
+  "inbounds": [
+    {
+      "port": 1234,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      },
+      "settings": {
+        "auth": "noauth",
+        "udp": false
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "$SERVER_NAME",
+            "port": 443,
+            "users": [
+              {
+                "id": "$UUID",
+                "alterId": 0
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "facebook.com",
+          "allowInsecure": true
+        },
+        "wsSettings": {
+          "path": "/ray"
+        }
+      }
+    }
+  ]
+}
+
+EOF
+)
+
+echo $V2RAY_CLIENT_CONFIG
